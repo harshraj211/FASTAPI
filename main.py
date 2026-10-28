@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Response, status, HTTPException
 from fastapi.params import Body
 from pydantic import BaseModel
 from random import randrange
@@ -12,6 +12,8 @@ class Post(BaseModel):
     title: str                  # Post title must be a string
     content: str                # Post content must be a string
     published: bool = True      # Defaults to True if not provided
+
+
 
 
 # Temporary in-memory storage for posts
@@ -31,13 +33,17 @@ my_posts = [
 
 
 # Find a post by its ID
-def find_post(id):
+def find_post(id, response=Response):
     for p in my_posts:
         # Return the post if its ID matches the given ID
         if p["id"] == id:
             return p
 
     # Returns None automatically if no matching post is found
+def find_index_post(id):
+    for i,p in enumerate(my_posts):
+        if p['id']==id:
+            return i
 
 
 # Root endpoint: GET /
@@ -56,7 +62,7 @@ def get_posts():
 
 # POST /posts
 # Creates a new post using the JSON request body
-@app.post("/posts")
+@app.post("/posts", status_code=status.HTTP_201_CREATED)
 def create_post(post: Post):
     # Convert the Pydantic model into a regular Python dictionary
     post_dict = post.model_dump()
@@ -76,12 +82,41 @@ def create_post(post: Post):
 # GET /posts/{id}
 # Returns a specific post based on its ID
 @app.get("/posts/{id}")
-def get_post(id: int):
+def get_post(id: int, response: Response):
     # FastAPI converts the URL parameter to an integer
     print(id)
 
     # Search for the post with the given ID
     post = find_post(id)
+    if not post:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"post with id: {id} don't exist in database")
 
-    # Return the matching post (or None if it doesn't exist)
+
+    # Return the matching post
     return {"post_details": post}
+
+
+@app.delete("/posts/{id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_post(id:int):
+    #deleting_post
+    #find the index in the array that has required id
+    #my_post.pop(index)
+    index= find_index_post(id)
+    if index==None:
+        raise  HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"User with id {id} does not exist so it cant be deleted")
+    my_posts.pop(index)
+    return {'message':'post was successfully deleted'}
+
+@app.put("/posts/{id}", status_code=status.HTTP_200_OK)
+def update_post(id: int, post:Post):
+    index= find_index_post(id)
+    if index==None:
+        raise  HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"User with id {id} does not exist so it cant be updated")
+    post_dict=post.model_dump()
+    post_dict['id']=id
+    my_posts[index]=post_dict
+    return {"data":post_dict}
+    # return {'message':'post successfully updated'}
+
+
+
